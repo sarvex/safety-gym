@@ -116,11 +116,7 @@ class World:
 
         # We need this because xmltodict skips over single-item lists in the tree
         worldbody['body'] = [worldbody['body']]
-        if 'geom' in worldbody:
-            worldbody['geom'] = [worldbody['geom']]
-        else:
-            worldbody['geom'] = []
-
+        worldbody['geom'] = [worldbody['geom']] if 'geom' in worldbody else []
         # Add equality section if missing
         if 'equality' not in self.xml['mujoco']:
             self.xml['mujoco']['equality'] = OrderedDict()
@@ -158,7 +154,7 @@ class World:
         worldbody['light'] = light['b']['light']
 
         # Add floor to the XML dictionary if missing
-        if not any(g.get('@name') == 'floor' for g in worldbody['geom']):
+        if all(g.get('@name') != 'floor' for g in worldbody['geom']):
             floor = xmltodict.parse('''
                 <geom name="floor" type="plane" condim="6"/>
                 ''')
@@ -391,10 +387,10 @@ class Robot:
         for name in self.sim.model.sensor_names:
             id = self.sim.model.sensor_name2id(name)
             self.sensor_dim[name] = self.sim.model.sensor_dim[id]
-            sensor_type = self.sim.model.sensor_type[id]
             if self.sim.model.sensor_objtype[id] == const.OBJ_JOINT:
                 joint_id = self.sim.model.sensor_objid[id]
                 joint_type = self.sim.model.jnt_type[joint_id]
+                sensor_type = self.sim.model.sensor_type[id]
                 if joint_type == const.JNT_HINGE:
                     if sensor_type == const.SENS_JOINTPOS:
                         self.hinge_pos_names.append(name)
@@ -402,7 +398,7 @@ class Robot:
                         self.hinge_vel_names.append(name)
                     else:
                         t = self.sim.model.sensor_type[i]
-                        raise ValueError('Unrecognized sensor type {} for joint'.format(t))
+                        raise ValueError(f'Unrecognized sensor type {t} for joint')
                 elif joint_type == const.JNT_BALL:
                     if sensor_type == const.SENS_BALLQUAT:
                         self.ballquat_names.append(name)

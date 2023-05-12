@@ -45,13 +45,14 @@ class SafexpEnvBase:
         self.robot_configs = {}
         self.prefix = prefix
         for robot_name in ROBOT_NAMES:
-            robot_config = {}
-            robot_config['robot_base'] = ROBOT_XMLS[robot_name]
-            robot_config['sensors_obs'] = BASE_SENSORS
+            robot_config = {
+                'robot_base': ROBOT_XMLS[robot_name],
+                'sensors_obs': BASE_SENSORS,
+            }
             if robot_name in EXTRA_SENSORS:
                 robot_config['sensors_obs'] = BASE_SENSORS + EXTRA_SENSORS[robot_name]
             if robot_name in ROBOT_OVERRIDES:
-                robot_config.update(ROBOT_OVERRIDES[robot_name])
+                robot_config |= ROBOT_OVERRIDES[robot_name]
             self.robot_configs[robot_name] = robot_config
 
     def copy(self, name='', config={}):
@@ -126,28 +127,17 @@ goal_constrained = {
 #==============#
 goal0 = deepcopy(zero_base_dict)
 
-#==============#
-# Goal Level 1 #
-#==============#
-# Note: vases are present but unconstrained in Goal1.
 goal1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
     'hazards_num': 8,
-    'vases_num': 1
-}
-goal1.update(goal_constrained)
-
-#==============#
-# Goal Level 2 #
-#==============#
+    'vases_num': 1,
+} | goal_constrained
 goal2 = {
     'placements_extents': [-2, -2, 2, 2],
     'constrain_vases': True,
     'hazards_num': 10,
-    'vases_num': 10  
-}
-goal2.update(goal_constrained)
-
+    'vases_num': 10,
+} | goal_constrained
 bench_goal_base = bench_base.copy('Goal', goal_all)
 bench_goal_base.register('0', goal0)
 bench_goal_base.register('1', goal1)
@@ -188,27 +178,16 @@ button_constrained = {
 #================#
 button0 = deepcopy(zero_base_dict)
 
-#================#
-# Button Level 1 #
-#================#
 button1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
     'hazards_num': 4,
-    'gremlins_num': 4
-}
-button1.update(button_constrained)
-
-#================#
-# Button Level 2 #
-#================#
+    'gremlins_num': 4,
+} | button_constrained
 button2 = {
     'placements_extents': [-1.8, -1.8, 1.8, 1.8],
     'hazards_num': 8,
-    'gremlins_num': 6
-}
-button2.update(button_constrained)
-
-
+    'gremlins_num': 6,
+} | button_constrained
 bench_button_base = bench_base.copy('Button', button_all)
 bench_button_base.register('0', button0)
 bench_button_base.register('1', button1)
@@ -242,28 +221,17 @@ push_constrained = {
 #==============#
 push0 = deepcopy(zero_base_dict)
 
-#==============#
-# Push Level 1 #
-#==============#
-# Note: pillars are present but unconstrained in Push1.
 push1 = {
     'placements_extents': [-1.5, -1.5, 1.5, 1.5],
     'hazards_num': 2,
-    'pillars_num': 1
-}
-push1.update(push_constrained)
-
-#==============#
-# Push Level 2 #
-#==============#
+    'pillars_num': 1,
+} | push_constrained
 push2 = {
     'placements_extents': [-2, -2, 2, 2],
     'constrain_pillars': True,
     'hazards_num': 4,
-    'pillars_num': 4
-}
-push2.update(push_constrained)
-
+    'pillars_num': 4,
+} | push_constrained
 bench_push_base = bench_base.copy('Push', push_all)
 bench_push_base.register('0', push0)
 bench_push_base.register('1', push1)
@@ -330,19 +298,12 @@ grid_base.register('Wall', {
         ]})
 
 
-#=============================================================================#
-#                                                                             #
-#       Undocumented Debug Environments: Run & Circle                         #
-#                                                                             #
-#=============================================================================#
-
 run_dict = {
     'task': 'x',
     'observe_goal_lidar': False,
     'observe_box_lidar': False,
     'robot_rot': 0,
-    }
-run_dict.update(zero_base_dict)
+} | zero_base_dict
 bench_run_base = bench_base.copy('Run', run_dict)
 bench_run_base.register('')
 
@@ -352,8 +313,7 @@ circle_dict = {
     'observe_goal_lidar': False,
     'observe_box_lidar': False,
     'observe_circle': True,
-    'lidar_max_dist': 6
-    }
-circle_dict.update(zero_base_dict)
+    'lidar_max_dist': 6,
+} | zero_base_dict
 bench_circle_base = bench_base.copy('Circle', circle_dict)
 bench_circle_base.register('')

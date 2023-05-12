@@ -481,7 +481,9 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Flatten it ourselves
         self.obs_space_dict = obs_space_dict
         if self.observation_flatten:
-            self.obs_flat_size = sum([np.prod(i.shape) for i in self.obs_space_dict.values()])
+            self.obs_flat_size = sum(
+                np.prod(i.shape) for i in self.obs_space_dict.values()
+            )
             self.observation_space = gym.spaces.Box(-np.inf, np.inf, (self.obs_flat_size,), dtype=np.float32)
         else:
             self.observation_space = gym.spaces.Dict(obs_space_dict)
@@ -498,19 +500,19 @@ class Engine(gym.Env, gym.utils.EzPickle):
     def placements_dict_from_object(self, object_name):
         ''' Get the placements dict subset just for a given object name '''
         placements_dict = {}
-        if hasattr(self, object_name + 's_num'):  # Objects with multiplicity
-            plural_name = object_name + 's'
+        if hasattr(self, f'{object_name}s_num'):  # Objects with multiplicity
+            plural_name = f'{object_name}s'
             object_fmt = object_name + '{i}'
-            object_num = getattr(self, plural_name + '_num', None)
-            object_locations = getattr(self, plural_name + '_locations', [])
-            object_placements = getattr(self, plural_name + '_placements', None)
-            object_keepout = getattr(self, plural_name + '_keepout')
+            object_num = getattr(self, f'{plural_name}_num', None)
+            object_locations = getattr(self, f'{plural_name}_locations', [])
+            object_placements = getattr(self, f'{plural_name}_placements', None)
+            object_keepout = getattr(self, f'{plural_name}_keepout')
         else:  # Unique objects
             object_fmt = object_name
             object_num = 1
-            object_locations = getattr(self, object_name + '_locations', [])
-            object_placements = getattr(self, object_name + '_placements', None)
-            object_keepout = getattr(self, object_name + '_keepout')
+            object_locations = getattr(self, f'{object_name}_locations', [])
+            object_placements = getattr(self, f'{object_name}_placements', None)
+            object_keepout = getattr(self, f'{object_name}_keepout')
         for i in range(object_num):
             if i < len(object_locations):
                 x, y = object_locations[i]
@@ -526,7 +528,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Dictionary is map from object name -> tuple of (placements list, keepout)
         placements = {}
 
-        placements.update(self.placements_dict_from_object('robot'))
+        placements |= self.placements_dict_from_object('robot')
         placements.update(self.placements_dict_from_object('wall'))
 
         if self.task in ['goal', 'push']:
@@ -639,14 +641,13 @@ class Engine(gym.Env, gym.utils.EzPickle):
     def build_world_config(self):
         ''' Create a world_config from our own config '''
         # TODO: parse into only the pieces we want/need
-        world_config = {}
-
-        world_config['robot_base'] = self.robot_base
-        world_config['robot_xy'] = self.layout['robot']
-        if self.robot_rot is None:
-            world_config['robot_rot'] = self.random_rot()
-        else:
-            world_config['robot_rot'] = float(self.robot_rot)
+        world_config = {
+            'robot_base': self.robot_base,
+            'robot_xy': self.layout['robot'],
+            'robot_rot': self.random_rot()
+            if self.robot_rot is None
+            else float(self.robot_rot),
+        }
 
         if self.floor_display_mode:
             floor_size = max(self.placements_extents)
@@ -671,7 +672,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
                           'rgba': COLOR_VASE}
                 world_config['objects'][name] = object
         if self.gremlins_num:
-            self._gremlins_rots = dict()
+            self._gremlins_rots = {}
             for i in range(self.gremlins_num):
                 name = f'gremlin{i}obj'
                 self._gremlins_rots[i] = self.random_rot()
@@ -804,9 +805,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
             self.last_dist_goal = self.dist_goal()
         elif self.task in ['x', 'z']:
             self.last_robot_com = self.world.robot_com()
-        elif self.task in ['circle', 'none']:
-            pass
-        else:
+        elif self.task not in ['circle', 'none']:
             raise ValueError(f'Invalid task {self.task}')
 
     def sample_goal_position(self):
@@ -1086,7 +1085,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
                     obs[sensor] = self.world.get_sensor(sensor)
         if self.observe_remaining:
             obs['remaining'] = np.array([self.steps / self.num_steps])
-            assert 0.0 <= obs['remaining'][0] <= 1.0, 'bad remaining {}'.format(obs['remaining'])
+            assert 0.0 <= obs['remaining'][0] <= 1.0, f"bad remaining {obs['remaining']}"
         if self.walls_num and self.observe_walls:
             obs['walls_lidar'] = self.obs_lidar(self.walls_pos, GROUP_WALL)
         if self.observe_hazards:
@@ -1098,7 +1097,6 @@ class Engine(gym.Env, gym.utils.EzPickle):
         if self.pillars_num and self.observe_pillars:
             obs['pillars_lidar'] = self.obs_lidar(self.pillars_pos, GROUP_PILLAR)
         if self.buttons_num and self.observe_buttons:
-            # Buttons observation is zero while buttons are resetting
             if self.buttons_timer == 0:
                 obs['buttons_lidar'] = self.obs_lidar(self.buttons_pos, GROUP_BUTTON)
             else:
@@ -1140,19 +1138,31 @@ class Engine(gym.Env, gym.utils.EzPickle):
         for contact in self.data.contact[:self.data.ncon]:
             geom_ids = [contact.geom1, contact.geom2]
             geom_names = sorted([self.model.geom_id2name(g) for g in geom_ids])
-            if self.constrain_vases and any(n.startswith('vase') for n in geom_names):
-                if any(n in self.robot.geom_names for n in geom_names):
-                    cost['cost_vases_contact'] += self.vases_contact_cost
-            if self.constrain_pillars and any(n.startswith('pillar') for n in geom_names):
-                if any(n in self.robot.geom_names for n in geom_names):
-                    cost['cost_pillars'] += self.pillars_cost
-            if buttons_constraints_active and any(n.startswith('button') for n in geom_names):
-                if any(n in self.robot.geom_names for n in geom_names):
-                    if not any(n == f'button{self.goal_button}' for n in geom_names):
-                        cost['cost_buttons'] += self.buttons_cost
-            if self.constrain_gremlins and any(n.startswith('gremlin') for n in geom_names):
-                if any(n in self.robot.geom_names for n in geom_names):
-                    cost['cost_gremlins'] += self.gremlins_contact_cost
+            if (
+                self.constrain_vases
+                and any(n.startswith('vase') for n in geom_names)
+                and any(n in self.robot.geom_names for n in geom_names)
+            ):
+                cost['cost_vases_contact'] += self.vases_contact_cost
+            if (
+                self.constrain_pillars
+                and any(n.startswith('pillar') for n in geom_names)
+                and any(n in self.robot.geom_names for n in geom_names)
+            ):
+                cost['cost_pillars'] += self.pillars_cost
+            if (
+                buttons_constraints_active
+                and any(n.startswith('button') for n in geom_names)
+                and any(n in self.robot.geom_names for n in geom_names)
+                and all(n != f'button{self.goal_button}' for n in geom_names)
+            ):
+                cost['cost_buttons'] += self.buttons_cost
+            if (
+                self.constrain_gremlins
+                and any(n.startswith('gremlin') for n in geom_names)
+                and any(n in self.robot.geom_names for n in geom_names)
+            ):
+                cost['cost_gremlins'] += self.gremlins_contact_cost
 
         # Displacement processing
         if self.constrain_vases and self.vases_displace_cost:
@@ -1203,9 +1213,10 @@ class Engine(gym.Env, gym.utils.EzPickle):
             for contact in self.data.contact[:self.data.ncon]:
                 geom_ids = [contact.geom1, contact.geom2]
                 geom_names = sorted([self.model.geom_id2name(g) for g in geom_ids])
-                if any(n == f'button{self.goal_button}' for n in geom_names):
-                    if any(n in self.robot.geom_names for n in geom_names):
-                        return True
+                if any(
+                    n == f'button{self.goal_button}' for n in geom_names
+                ) and any(n in self.robot.geom_names for n in geom_names):
+                    return True
             return False
         if self.task in ['x', 'z', 'circle', 'none']:
             return False
@@ -1219,7 +1230,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
                 name = f'gremlin{i}'
                 target = np.array([np.sin(phase), np.cos(phase)]) * self.gremlins_travel
                 pos = np.r_[target, [self.gremlins_size]]
-                self.data.set_mocap_pos(name + 'mocap', pos)
+                self.data.set_mocap_pos(f'{name}mocap', pos)
 
     def update_layout(self):
         ''' Update layout dictionary with new places of objects '''
@@ -1269,7 +1280,7 @@ class Engine(gym.Env, gym.utils.EzPickle):
             reward = self.reward()
 
             # Constraint violations
-            info.update(self.cost())
+            info |= self.cost()
 
             # Button timer (used to delay button resampling)
             self.buttons_timer_tick()
@@ -1444,17 +1455,21 @@ class Engine(gym.Env, gym.utils.EzPickle):
         # Lidar markers
         if self.render_lidar_markers:
             offset = self.render_lidar_offset_init  # Height offset for successive lidar indicators
-            if 'box_lidar' in self.obs_space_dict or 'box_compass' in self.obs_space_dict:
-                if 'box_lidar' in self.obs_space_dict:
-                    self.render_lidar([self.box_pos], COLOR_BOX, offset, GROUP_BOX)
+            if 'box_lidar' in self.obs_space_dict:
+                self.render_lidar([self.box_pos], COLOR_BOX, offset, GROUP_BOX)
                 if 'box_compass' in self.obs_space_dict:
                     self.render_compass(self.box_pos, COLOR_BOX, offset)
                 offset += self.render_lidar_offset_delta
-            if 'goal_lidar' in self.obs_space_dict or 'goal_compass' in self.obs_space_dict:
-                if 'goal_lidar' in self.obs_space_dict:
-                    self.render_lidar([self.goal_pos], COLOR_GOAL, offset, GROUP_GOAL)
+            elif 'box_compass' in self.obs_space_dict:
+                self.render_compass(self.box_pos, COLOR_BOX, offset)
+                offset += self.render_lidar_offset_delta
+            if 'goal_lidar' in self.obs_space_dict:
+                self.render_lidar([self.goal_pos], COLOR_GOAL, offset, GROUP_GOAL)
                 if 'goal_compass' in self.obs_space_dict:
                     self.render_compass(self.goal_pos, COLOR_GOAL, offset)
+                offset += self.render_lidar_offset_delta
+            elif 'goal_compass' in self.obs_space_dict:
+                self.render_compass(self.goal_pos, COLOR_GOAL, offset)
                 offset += self.render_lidar_offset_delta
             if 'buttons_lidar' in self.obs_space_dict:
                 self.render_lidar(self.buttons_pos, COLOR_BUTTON, offset, GROUP_BUTTON)

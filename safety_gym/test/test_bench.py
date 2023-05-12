@@ -68,14 +68,13 @@ class TestBench(unittest.TestCase):
             act = np.zeros(env.action_space.shape)
             act[0] = 1
             _, reward, done, info = env.step(act)
-            if not hazard_found:
-                if info['cost']:
-                    hazard_found = True
-                    self.assertEqual(info['cost'], 1.0)  # Sparse costs
-                    self.assertGreater(info['cost_hazards'], 0.0)  # Nonzero hazard cost
+            if not hazard_found and info['cost']:
+                hazard_found = True
+                self.assertEqual(info['cost'], 1.0)  # Sparse costs
+                self.assertGreater(info['cost_hazards'], 0.0)  # Nonzero hazard cost
             if 'goal_met' in info:
                 goal_met = info['goal_met']
-            # env.render()  # Uncomment to visualize test
+                # env.render()  # Uncomment to visualize test
         self.assertTrue(hazard_found)
         self.assertTrue(goal_met)
 
@@ -106,19 +105,18 @@ class TestBench(unittest.TestCase):
             act = np.zeros(env.action_space.shape)
             act[0] = 1
             _, reward, done, info = env.step(act)
-            if not vase_found:
-                if info['cost']:
-                    vase_found = True
-                    self.assertEqual(info['cost'], 1.0)  # Sparse costs
-                    self.assertGreater(info['cost_vases_contact'], 0.0)  # Nonzero vase cost
-                    self.assertGreater(info['cost_vases_velocity'], 0.0)  # Nonzero vase cost
-            else:
+            if vase_found:
                 # We've already found the vase (and hit it), ensure displace cost
                 self.assertEqual(info['cost'], 1.0)  # Sparse costs
                 self.assertGreater(info['cost_vases_displace'], 0.0)  # Nonzero vase cost
+            elif info['cost']:
+                vase_found = True
+                self.assertEqual(info['cost'], 1.0)  # Sparse costs
+                self.assertGreater(info['cost_vases_contact'], 0.0)  # Nonzero vase cost
+                self.assertGreater(info['cost_vases_velocity'], 0.0)  # Nonzero vase cost
             if 'goal_met' in info:
                 goal_met = info['goal_met']
-            # env.render()  # Uncomment to visualize test
+                # env.render()  # Uncomment to visualize test
         self.assertTrue(vase_found)
         self.assertTrue(goal_met)
 
@@ -164,11 +162,11 @@ class TestBench(unittest.TestCase):
 
     def test_correct_lidar(self):
         ''' We should have lidar for every object in the env '''
-        matched = []
-        for env_spec in gym.envs.registry.all():
-            #if re.match(r'Safexp-.*-v0', env_spec.id) is not None:
-            if 'Safexp' in env_spec.id and not('Vision' in env_spec.id):
-                matched.append(env_spec.id)
+        matched = [
+            env_spec.id
+            for env_spec in gym.envs.registry.all()
+            if 'Safexp' in env_spec.id and 'Vision' not in env_spec.id
+        ]
         assert matched, 'Failed to match any environments!'
         for env_name in matched:
             print(env_name)
